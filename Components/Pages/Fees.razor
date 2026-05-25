@@ -1,0 +1,1444 @@
+@page "/fees"
+@using SchoolManagementApp.Models
+@using SchoolManagementApp.Services
+@inject IDataService<FeeRecord> FeeService
+@inject IDataService<Student> StudentService
+@inject IDataService<FeeStructure> FeeStructureService
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col">
+            <h3><i class="bi bi-currency-rupee"></i> Fee Management System</h3>
+        </div>
+        <div class="col text-end">
+            <div class="btn-group">
+                <button class="btn btn-primary" @onclick="ShowAddForm">
+                    <i class="bi bi-plus-circle"></i> Add Fee Record
+                </button>
+                <button class="btn btn-success" @onclick="ShowBulkFeeGeneration">
+                    <i class="bi bi-lightning-charge"></i> Bulk Generate
+                </button>
+                <button class="btn btn-info" @onclick="ShowFeeStructure">
+                    <i class="bi bi-gear"></i> Fee Structure
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Dashboard -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-gradient-success text-white shadow-lg">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Total Collected</h6>
+                            <h3 class="mb-0">₹@TotalPaid.ToString("N2")</h3>
+                            <small>@PaidCount payments</small>
+                        </div>
+                        <i class="bi bi-cash-stack" style="font-size: 3rem; opacity: 0.3;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white shadow-lg">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Pending</h6>
+                            <h3 class="mb-0">₹@TotalPending.ToString("N2")</h3>
+                            <small>@PendingCount invoices</small>
+                        </div>
+                        <i class="bi bi-hourglass-split" style="font-size: 3rem; opacity: 0.3;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-danger text-white shadow-lg">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Overdue</h6>
+                            <h3 class="mb-0">₹@TotalOverdue.ToString("N2")</h3>
+                            <small>@OverdueCount invoices</small>
+                        </div>
+                        <i class="bi bi-exclamation-triangle" style="font-size: 3rem; opacity: 0.3;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-info text-white shadow-lg">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Collection Rate</h6>
+                            <h3 class="mb-0">@GetCollectionRate()%</h3>
+                            <small>of total fees</small>
+                        </div>
+                        <i class="bi bi-graph-up-arrow" style="font-size: 3rem; opacity: 0.3;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Collection Chart -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Monthly Collection Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        @foreach (var month in GetLastSixMonthsCollection())
+                        {
+                            <div class="col-md-2 mb-3">
+                                <div class="p-3 border rounded">
+                                    <small class="text-muted">@month.Month</small>
+                                    <h5 class="text-success mb-0">₹@month.Amount.ToString("N0")</h5>
+                                    <small class="text-muted">@month.Count txns</small>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Fee Type Distribution</h5>
+                </div>
+                <div class="card-body">
+                    @foreach (var feeType in GetFeeTypeDistribution())
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small><strong>@feeType.Type</strong></small>
+                                <small>₹@feeType.Amount.ToString("N0")</small>
+                            </div>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar @GetRandomColor()" 
+                                     style="width: @feeType.Percentage%"
+                                     role="progressbar">
+                                    @feeType.Percentage.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Fee Form -->
+    @if (showForm)
+    {
+        <div class="card mb-3 shadow-lg border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi @(isEditing ? "bi-pencil-square" : "bi-plus-circle")"></i>
+                    @(isEditing ? "Edit Fee Record" : "Add New Fee Record")
+                </h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="currentFee" OnValidSubmit="SaveFee">
+                    <div class="row">
+                        <!-- Student Selection -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Student <span class="text-danger">*</span></label>
+                            <select class="form-select" @onchange="OnStudentSelected" disabled="@isEditing">
+                                <option value="">-- Select Student --</option>
+                                @foreach (var student in students.Where(s => s.IsActive))
+                                {
+                                    <option value="@student.Id" selected="@(student.Id == currentFee.StudentId)">
+                                        @student.RollNumber - @student.FirstName @student.LastName (Class: @student.Class-@student.Section)
+                                    </option>
+                                }
+                            </select>
+                            @if (!string.IsNullOrEmpty(currentFee.StudentName))
+                            {
+                                <small class="text-success">
+                                    <i class="bi bi-check-circle"></i> Selected: @currentFee.StudentName
+                                </small>
+                            }
+                        </div>
+
+                        <!-- Academic Year -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-bold">Academic Year</label>
+                            <select class="form-select" @bind="currentFee.AcademicYear">
+                                <option value="@(DateTime.Now.Year - 1)">@(DateTime.Now.Year - 1)-@DateTime.Now.Year</option>
+                                <option value="@DateTime.Now.Year">@DateTime.Now.Year-@(DateTime.Now.Year + 1)</option>
+                                <option value="@(DateTime.Now.Year + 1)">@(DateTime.Now.Year + 1)-@(DateTime.Now.Year + 2)</option>
+                            </select>
+                        </div>
+
+                        <!-- Fee Type -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-bold">Fee Type <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="currentFee.FeeType" @bind:after="OnFeeTypeChanged">
+                                <option value="">-- Select Type --</option>
+                                <option value="Tuition Fee">📚 Tuition Fee</option>
+                                <option value="Admission Fee">🎓 Admission Fee</option>
+                                <option value="Transport Fee">🚌 Transport Fee</option>
+                                <option value="Library Fee">📖 Library Fee</option>
+                                <option value="Exam Fee">📝 Exam Fee</option>
+                                <option value="Sports Fee">⚽ Sports Fee</option>
+                                <option value="Computer Lab Fee">💻 Computer Lab Fee</option>
+                                <option value="Annual Function">🎭 Annual Function</option>
+                                <option value="Hostel Fee">🏠 Hostel Fee</option>
+                                <option value="Other">📌 Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Fee Month (for monthly fees) -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-bold">Fee Month</label>
+                            <select class="form-select" @bind="currentFee.FeeMonth">
+                                <option value="">-- Select Month --</option>
+                                <option value="January">January</option>
+                                <option value="February">February</option>
+                                <option value="March">March</option>
+                                <option value="April">April</option>
+                                <option value="May">May</option>
+                                <option value="June">June</option>
+                                <option value="July">July</option>
+                                <option value="August">August</option>
+                                <option value="September">September</option>
+                                <option value="October">October</option>
+                                <option value="November">November</option>
+                                <option value="December">December</option>
+                            </select>
+                        </div>
+
+                        <!-- Amount -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-bold">Amount (₹) <span class="text-danger">*</span></label>
+                            <InputNumber class="form-control" @bind-Value="currentFee.Amount" 
+                                       @oninput="CalculateTotalAmount" placeholder="0.00" />
+                        </div>
+
+                        <!-- Late Fee -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-bold">Late Fee (₹)</label>
+                            <InputNumber class="form-control" @bind-Value="currentFee.LateFee" 
+                                       @oninput="CalculateTotalAmount" placeholder="0.00" />
+                        </div>
+
+                        <!-- Discount -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-bold">Discount (₹)</label>
+                            <InputNumber class="form-control" @bind-Value="currentFee.Discount" 
+                                       @oninput="CalculateTotalAmount" placeholder="0.00" />
+                        </div>
+                    </div>
+
+                    <!-- Total Amount Display -->
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="alert alert-info">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <strong>Base Amount:</strong> ₹@currentFee.Amount.ToString("N2")
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Late Fee:</strong> ₹@currentFee.LateFee.ToString("N2")
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Discount:</strong> -₹@currentFee.Discount.ToString("N2")
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong class="text-primary">Total Amount:</strong> 
+                                        <span class="fs-5 text-primary">₹@currentFee.TotalAmount.ToString("N2")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Due Date -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Due Date <span class="text-danger">*</span></label>
+                            <InputDate class="form-control" @bind-Value="currentFee.DueDate" />
+                        </div>
+
+                        <!-- Status -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Payment Status</label>
+                            <select class="form-select" @bind="currentFee.Status" @bind:after="OnStatusChanged">
+                                <option value="Pending">⏳ Pending</option>
+                                <option value="Paid">✅ Paid</option>
+                                <option value="Partial">💰 Partial Payment</option>
+                                <option value="Overdue">⚠️ Overdue</option>
+                            </select>
+                        </div>
+
+                        <!-- Paid Amount (if status is Paid or Partial) -->
+                        @if (currentFee.Status == "Paid" || currentFee.Status == "Partial")
+                        {
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Paid Amount (₹)</label>
+                                <InputNumber class="form-control" @bind-Value="currentFee.PaidAmount" placeholder="0.00" />
+                                <small class="text-muted">Balance: ₹@currentFee.BalanceAmount.ToString("N2")</small>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Payment Details (Show when status is Paid or Partial) -->
+                    @if (currentFee.Status == "Paid" || currentFee.Status == "Partial")
+                    {
+                        <div class="row bg-light p-3 rounded mb-3">
+                            <div class="col-12 mb-2">
+                                <h6 class="text-primary"><i class="bi bi-credit-card"></i> Payment Details</h6>
+                            </div>
+                            
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Payment Date</label>
+                                <InputDate class="form-control" @bind-Value="currentFee.PaymentDate" />
+                            </div>
+
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Payment Method</label>
+                                <select class="form-select" @bind="currentFee.PaymentMethod">
+                                    <option value="">-- Select Method --</option>
+                                    <option value="Cash">💵 Cash</option>
+                                    <option value="Card">💳 Debit/Credit Card</option>
+                                    <option value="Online">🌐 Online Transfer</option>
+                                    <option value="UPI">📱 UPI</option>
+                                    <option value="Cheque">📝 Cheque</option>
+                                    <option value="Demand Draft">📄 Demand Draft</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Transaction ID</label>
+                                <InputText class="form-control" @bind-Value="currentFee.TransactionId" 
+                                         placeholder="TXN123456789" />
+                            </div>
+
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Receipt Number</label>
+                                <InputText class="form-control" @bind-Value="currentFee.ReceiptNumber" 
+                                         placeholder="Auto-generated" readonly="@string.IsNullOrEmpty(currentFee.ReceiptNumber)" />
+                                @if (string.IsNullOrEmpty(currentFee.ReceiptNumber))
+                                {
+                                    <small class="text-muted">Will be auto-generated</small>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Remarks -->
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label fw-bold">Remarks / Notes</label>
+                            <InputTextArea class="form-control" @bind-Value="currentFee.Remarks" 
+                                         rows="3" placeholder="Add any additional notes or comments..." />
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-save"></i> Save Fee Record
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-lg" @onclick="CancelForm">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                        @if (isEditing && (currentFee.Status == "Paid" || currentFee.Status == "Partial"))
+                        {
+                            <button type="button" class="btn btn-info btn-lg" @onclick="PrintReceipt">
+                                <i class="bi bi-printer"></i> Print Receipt
+                            </button>
+                        }
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <!-- Bulk Fee Generation Modal -->
+    @if (showBulkGeneration)
+    {
+        <div class="card mb-3 shadow-lg border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge"></i> Bulk Fee Generation</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">Select Class</label>
+                        <select class="form-select" @bind="bulkClass">
+                            <option value="">All Classes</option>
+                            @foreach (var cls in GetUniqueClasses())
+                            {
+                                <option value="@cls">@cls</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">Fee Type</label>
+                        <select class="form-select" @bind="bulkFeeType">
+                            <option value="">-- Select --</option>
+                            <option value="Tuition Fee">Tuition Fee</option>
+                            <option value="Transport Fee">Transport Fee</option>
+                            <option value="Exam Fee">Exam Fee</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label fw-bold">Amount (₹)</label>
+                        <input type="number" class="form-control" @bind="bulkAmount" placeholder="0.00" />
+                    </div>
+
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label fw-bold">Due Date</label>
+                        <input type="date" class="form-control" @bind="bulkDueDate" />
+                    </div>
+
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label fw-bold">Month</label>
+                        <select class="form-select" @bind="bulkMonth">
+                            <option value="">N/A</option>
+                            <option value="January">January</option>
+                            <option value="February">February</option>
+                            <option value="March">March</option>
+                            <option value="April">April</option>
+                            <option value="May">May</option>
+                            <option value="June">June</option>
+                            <option value="July">July</option>
+                            <option value="August">August</option>
+                            <option value="September">September</option>
+                            <option value="October">October</option>
+                            <option value="November">November</option>
+                            <option value="December">December</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    <strong>Preview:</strong> This will generate fee records for 
+                    <strong>@GetBulkStudentCount()</strong> students.
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" @onclick="GenerateBulkFees">
+                        <i class="bi bi-lightning-charge"></i> Generate Fees
+                    </button>
+                    <button class="btn btn-secondary" @onclick="() => showBulkGeneration = false">
+                        <i class="bi bi-x"></i> Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Fee Structure Management -->
+    @if (showFeeStructureForm)
+    {
+        <div class="card mb-3 shadow-lg border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Fee Structure Management</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary mb-3" @onclick="ShowAddFeeStructure">
+                    <i class="bi bi-plus"></i> Add Fee Structure
+                </button>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-info">
+                            <tr>
+                                <th>Class</th>
+                                <th>Fee Type</th>
+                                <th>Amount</th>
+                                <th>Frequency</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var structure in feeStructures.OrderBy(f => f.Class))
+                            {
+                                <tr>
+                                    <td><strong>@structure.Class</strong></td>
+                                    <td>@structure.FeeType</td>
+                                    <td>₹@structure.Amount.ToString("N2")</td>
+                                    <td><span class="badge bg-primary">@structure.Frequency</span></td>
+                                    <td>
+                                        <span class="badge @(structure.IsActive ? "bg-success" : "bg-danger")">
+                                            @(structure.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" @onclick="() => EditFeeStructure(structure)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteFeeStructure(structure.Id)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <button class="btn btn-secondary mt-3" @onclick="() => showFeeStructureForm = false">
+                    <i class="bi bi-x"></i> Close
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Add Fee Structure Form -->
+    @if (showAddFeeStructureForm)
+    {
+        <div class="card mb-3 shadow">
+            <div class="card-header">
+                <h6>@(isEditingStructure ? "Edit" : "Add") Fee Structure</h6>
+            </div>
+            <div class="card-body">
+                <EditForm Model="currentFeeStructure" OnValidSubmit="SaveFeeStructure">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Class</label>
+                            <select class="form-select" @bind="currentFeeStructure.Class">
+                                <option value="">Select Class</option>
+                                @foreach (var cls in GetUniqueClasses())
+                                {
+                                    <option value="@cls">@cls</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Fee Type</label>
+                            <select class="form-select" @bind="currentFeeStructure.FeeType">
+                                <option value="">Select Type</option>
+                                <option value="Tuition Fee">Tuition Fee</option>
+                                <option value="Transport Fee">Transport Fee</option>
+                                <option value="Library Fee">Library Fee</option>
+                                <option value="Exam Fee">Exam Fee</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Amount</label>
+                            <InputNumber class="form-control" @bind-Value="currentFeeStructure.Amount" />
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Frequency</label>
+                            <select class="form-select" @bind="currentFeeStructure.Frequency">
+                                <option value="Monthly">Monthly</option>
+                                <option value="Quarterly">Quarterly</option>
+                                <option value="Yearly">Yearly</option>
+                                <option value="One-time">One-time</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Status</label>
+                            <div class="form-check form-switch mt-2">
+                                <InputCheckbox class="form-check-input" @bind-Value="currentFeeStructure.IsActive" />
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">Save</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelFeeStructureForm">Cancel</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <!-- Fee Records Table -->
+    <div class="card shadow">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="bi bi-table"></i> Fee Records</h5>
+        </div>
+        <div class="card-body">
+            <!-- Filters -->
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" placeholder="🔍 Search student, receipt..." 
+                           @bind="searchTerm" @bind:event="oninput" />
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" @bind="filterStatus">
+                        <option value="">All Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Partial">Partial</option>
+                        <option value="Overdue">Overdue</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" @bind="filterFeeType">
+                        <option value="">All Fee Types</option>
+                        <option value="Tuition Fee">Tuition Fee</option>
+                        <option value="Transport Fee">Transport Fee</option>
+                        <option value="Library Fee">Library Fee</option>
+                        <option value="Exam Fee">Exam Fee</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" @bind="filterClass">
+                        <option value="">All Classes</option>
+                        @foreach (var cls in GetUniqueClasses())
+                        {
+                            <option value="@cls">@cls</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" @bind="filterMonth">
+                        <option value="">All Months</option>
+                        <option value="January">January</option>
+                        <option value="February">February</option>
+                        <option value="March">March</option>
+                        <option value="April">April</option>
+                        <option value="May">May</option>
+                        <option value="June">June</option>
+                        <option value="July">July</option>
+                        <option value="August">August</option>
+                        <option value="September">September</option>
+                        <option value="October">October</option>
+                        <option value="November">November</option>
+                        <option value="December">December</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-secondary w-100" @onclick="ClearFilters" title="Clear Filters">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark sticky-top">
+                        <tr>
+                            <th>Receipt#</th>
+                            <th>Student Details</th>
+                            <th>Fee Type</th>
+                            <th>Month</th>
+                            <th>Amount</th>
+                            <th>Paid</th>
+                            <th>Balance</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var fee in FilteredFees)
+                        {
+                            <tr class="@GetRowClass(fee)">
+                                <td>
+                                    <strong class="text-primary">@(fee.ReceiptNumber ?? "N/A")</strong>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>@fee.StudentName</strong><br />
+                                        <small class="text-muted">
+                                            Roll: @fee.RollNumber | Class: @fee.StudentClass
+                                        </small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">@fee.FeeType</span>
+                                </td>
+                                <td>@(fee.FeeMonth ?? "-")</td>
+                                <td class="text-end">
+                                    <strong>₹@fee.TotalAmount.ToString("N2")</strong>
+                                    @if (fee.LateFee > 0 || fee.Discount > 0)
+                                    {
+                                        <br />
+                                        <small class="text-muted">
+                                            @if (fee.LateFee > 0) { <span class="text-danger">+₹@fee.LateFee (Late)</span> }
+                                            @if (fee.Discount > 0) { <span class="text-success">-₹@fee.Discount (Disc)</span> }
+                                        </small>
+                                    }
+                                </td>
+                                <td class="text-end text-success">
+                                    <strong>₹@fee.PaidAmount.ToString("N2")</strong>
+                                </td>
+                                <td class="text-end @(fee.BalanceAmount > 0 ? "text-danger" : "text-success")">
+                                    <strong>₹@fee.BalanceAmount.ToString("N2")</strong>
+                                </td>
+                                <td>
+                                    @fee.DueDate.ToString("dd-MMM-yyyy")
+                                    @if (fee.DueDate < DateTime.Now && fee.Status != "Paid")
+                                    {
+                                        <br /><small class="text-danger">⚠️ Overdue</small>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(fee.Status) fs-6">
+                                        @GetStatusIcon(fee.Status) @fee.Status
+                                    </span>
+                                    @if (fee.PaymentDate.HasValue)
+                                    {
+                                        <br />
+                                        <small class="text-muted">@fee.PaymentDate.Value.ToString("dd-MMM")</small>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="btn-group-vertical btn-group-sm">
+                                        <button class="btn btn-warning btn-sm" @onclick="() => EditFee(fee)" title="Edit">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </button>
+                                        @if (fee.Status == "Paid" || fee.Status == "Partial")
+                                        {
+                                            <button class="btn btn-info btn-sm" @onclick="() => ViewReceipt(fee)" title="Receipt">
+                                                <i class="bi bi-receipt"></i> Receipt
+                                            </button>
+                                        }
+                                        @if (fee.Status == "Pending" || fee.Status == "Partial")
+                                        {
+                                            <button class="btn btn-success btn-sm" @onclick="() => QuickPayment(fee)" title="Quick Pay">
+                                                <i class="bi bi-cash"></i> Pay
+                                            </button>
+                                        }
+                                        <button class="btn btn-danger btn-sm" @onclick="() => DeleteFee(fee.Id)" title="Delete">
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="4" class="text-end">TOTALS:</th>
+                            <th class="text-end">₹@FilteredFees.Sum(f => f.TotalAmount).ToString("N2")</th>
+                            <th class="text-end text-success">₹@FilteredFees.Sum(f => f.PaidAmount).ToString("N2")</th>
+                            <th class="text-end text-danger">₹@FilteredFees.Sum(f => f.BalanceAmount).ToString("N2")</th>
+                            <th colspan="3"></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            @if (!fees.Any())
+            {
+                <div class="alert alert-info text-center mt-3">
+                    <i class="bi bi-info-circle fs-1"></i>
+                    <h5>No fee records found</h5>
+                    <p>Click "Add Fee Record" to create your first fee entry!</p>
+                </div>
+            }
+            else if (!FilteredFees.Any())
+            {
+                <div class="alert alert-warning text-center mt-3">
+                    <i class="bi bi-search fs-1"></i>
+                    <h5>No records match your filters</h5>
+                    <button class="btn btn-secondary" @onclick="ClearFilters">Clear Filters</button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Quick Payment Modal -->
+    @if (showQuickPayment)
+    {
+        <div class="modal-backdrop fade show"></div>
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="bi bi-cash-coin"></i> Quick Payment</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="CloseQuickPayment"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <strong>Student:</strong> @quickPaymentFee?.StudentName<br />
+                            <strong>Fee Type:</strong> @quickPaymentFee?.FeeType<br />
+                            <strong>Total Amount:</strong> ₹@quickPaymentFee?.TotalAmount.ToString("N2")<br />
+                            <strong>Already Paid:</strong> ₹@quickPaymentFee?.PaidAmount.ToString("N2")<br />
+                            <strong>Balance:</strong> <span class="text-danger">₹@quickPaymentFee?.BalanceAmount.ToString("N2")</span>
+                        </div>
+                        <hr />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Payment Amount (₹)</label>
+                            <input type="number" class="form-control" @bind="quickPayAmount" 
+                                   max="@quickPaymentFee?.BalanceAmount" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Payment Method</label>
+                            <select class="form-select" @bind="quickPayMethod">
+                                <option value="Cash">💵 Cash</option>
+                                <option value="Card">💳 Card</option>
+                                <option value="Online">🌐 Online</option>
+                                <option value="UPI">📱 UPI</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-success" @onclick="ProcessQuickPayment">
+                            <i class="bi bi-check-circle"></i> Process Payment
+                        </button>
+                        <button class="btn btn-secondary" @onclick="CloseQuickPayment">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Receipt View Modal -->
+    @if (showReceiptModal && selectedReceipt != null)
+    {
+        <div class="modal-backdrop fade show"></div>
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-receipt"></i> Fee Receipt</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="CloseReceipt"></button>
+                    </div>
+                    <div class="modal-body" id="receiptContent">
+                        <!-- Receipt Header -->
+                        <div class="text-center mb-4 border-bottom pb-3">
+                            <h3 class="text-primary">🏫 SCHOOL NAME</h3>
+                            <p class="mb-0">School Address Line 1, City - 000000</p>
+                            <p class="mb-0">Phone: +91-XXXXXXXXXX | Email: school@email.com</p>
+                        </div>
+
+                        <!-- Receipt Details -->
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <strong>Receipt No:</strong> @selectedReceipt.ReceiptNumber<br />
+                                <strong>Date:</strong> @selectedReceipt.PaymentDate?.ToString("dd-MMM-yyyy")
+                            </div>
+                            <div class="col-6 text-end">
+                                <strong>Academic Year:</strong> @selectedReceipt.AcademicYear<br />
+                                <strong>Payment Method:</strong> @selectedReceipt.PaymentMethod
+                            </div>
+                        </div>
+
+                        <!-- Student Details -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Student Details</h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <strong>Name:</strong> @selectedReceipt.StudentName<br />
+                                        <strong>Class:</strong> @selectedReceipt.StudentClass
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>Roll Number:</strong> @selectedReceipt.RollNumber
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fee Details Table -->
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Particulars</th>
+                                    <th class="text-end">Amount (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>@selectedReceipt.FeeType @(string.IsNullOrEmpty(selectedReceipt.FeeMonth) ? "" : $"- {selectedReceipt.FeeMonth}")</td>
+                                    <td class="text-end">@selectedReceipt.Amount.ToString("N2")</td>
+                                </tr>
+                                @if (selectedReceipt.LateFee > 0)
+                                {
+                                    <tr>
+                                        <td>Late Fee</td>
+                                        <td class="text-end text-danger">@selectedReceipt.LateFee.ToString("N2")</td>
+                                    </tr>
+                                }
+                                @if (selectedReceipt.Discount > 0)
+                                {
+                                    <tr>
+                                        <td>Discount</td>
+                                        <td class="text-end text-success">-@selectedReceipt.Discount.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th>Total Amount</th>
+                                    <th class="text-end">₹@selectedReceipt.TotalAmount.ToString("N2")</th>
+                                </tr>
+                                <tr>
+                                    <th>Paid Amount</th>
+                                    <th class="text-end text-success">₹@selectedReceipt.PaidAmount.ToString("N2")</th>
+                                </tr>
+                                @if (selectedReceipt.BalanceAmount > 0)
+                                {
+                                    <tr>
+                                        <th>Balance Due</th>
+                                        <th class="text-end text-danger">₹@selectedReceipt.BalanceAmount.ToString("N2")</th>
+                                    </tr>
+                                }
+                            </tfoot>
+                        </table>
+
+                        @if (!string.IsNullOrEmpty(selectedReceipt.TransactionId))
+                        {
+                            <p><strong>Transaction ID:</strong> @selectedReceipt.TransactionId</p>
+                        }
+
+                        @if (!string.IsNullOrEmpty(selectedReceipt.Remarks))
+                        {
+                            <p><strong>Remarks:</strong> @selectedReceipt.Remarks</p>
+                        }
+
+                        <div class="text-center mt-4 pt-3 border-top">
+                            <p class="mb-0"><em>This is a computer-generated receipt.</em></p>
+                            <p class="mb-0"><strong>Thank you!</strong></p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" @onclick="PrintReceipt">
+                            <i class="bi bi-printer"></i> Print Receipt
+                        </button>
+                        <button class="btn btn-secondary" @onclick="CloseReceipt">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<FeeRecord> fees = new();
+    private List<Student> students = new();
+    private List<FeeStructure> feeStructures = new();
+    private FeeRecord currentFee = new();
+    private FeeStructure currentFeeStructure = new();
+    private bool showForm = false;
+    private bool isEditing = false;
+    private string searchTerm = string.Empty;
+    private string filterStatus = string.Empty;
+    private string filterFeeType = string.Empty;
+    private string filterClass = string.Empty;
+    private string filterMonth = string.Empty;
+
+    // Bulk Generation
+    private bool showBulkGeneration = false;
+    private string bulkClass = string.Empty;
+    private string bulkFeeType = string.Empty;
+    private decimal bulkAmount = 0;
+    private DateTime bulkDueDate = DateTime.Today.AddDays(30);
+    private string bulkMonth = string.Empty;
+
+    // Fee Structure
+    private bool showFeeStructureForm = false;
+    private bool showAddFeeStructureForm = false;
+    private bool isEditingStructure = false;
+
+    // Quick Payment
+    private bool showQuickPayment = false;
+    private FeeRecord? quickPaymentFee = null;
+    private decimal quickPayAmount = 0;
+    private string quickPayMethod = "Cash";
+
+    // Receipt
+    private bool showReceiptModal = false;
+    private FeeRecord? selectedReceipt = null;
+
+    // Summary Calculations
+    private decimal TotalPaid => fees.Where(f => f.Status == "Paid").Sum(f => f.PaidAmount);
+    private decimal TotalPending => fees.Where(f => f.Status == "Pending").Sum(f => f.TotalAmount);
+    private decimal TotalOverdue => fees.Where(f => f.Status == "Overdue").Sum(f => f.BalanceAmount);
+    private int PaidCount => fees.Count(f => f.Status == "Paid");
+    private int PendingCount => fees.Count(f => f.Status == "Pending");
+    private int OverdueCount => fees.Count(f => f.Status == "Overdue");
+
+    private IEnumerable<FeeRecord> FilteredFees =>
+        fees.Where(f =>
+            (string.IsNullOrWhiteSpace(filterStatus) || f.Status == filterStatus) &&
+            (string.IsNullOrWhiteSpace(filterFeeType) || f.FeeType == filterFeeType) &&
+            (string.IsNullOrWhiteSpace(filterClass) || f.StudentClass == filterClass) &&
+            (string.IsNullOrWhiteSpace(filterMonth) || f.FeeMonth == filterMonth) &&
+            (string.IsNullOrWhiteSpace(searchTerm) ||
+            (f.StudentName ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (f.ReceiptNumber ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (f.RollNumber ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+        .OrderByDescending(f => f.CreatedDate);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        fees = await FeeService.GetAllAsync();
+        students = await StudentService.GetAllAsync();
+        
+        try
+        {
+            feeStructures = await FeeStructureService.GetAllAsync();
+        }
+        catch
+        {
+            feeStructures = new List<FeeStructure>();
+        }
+
+        // Auto-update overdue status
+        UpdateOverdueStatus();
+    }
+
+    private void UpdateOverdueStatus()
+    {
+        var overdueRecords = fees.Where(f => 
+            f.Status == "Pending" && 
+            f.DueDate < DateTime.Now).ToList();
+
+        foreach (var fee in overdueRecords)
+        {
+            fee.Status = "Overdue";
+            _ = FeeService.UpdateAsync(fee);
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        currentFee = new FeeRecord 
+        { 
+            DueDate = DateTime.Now.AddDays(30),
+            AcademicYear = DateTime.Now.Year.ToString()
+        };
+        isEditing = false;
+        showForm = true;
+    }
+
+    private void OnStudentSelected(ChangeEventArgs e)
+    {
+        var studentId = e.Value?.ToString();
+        var student = students.FirstOrDefault(s => s.Id == studentId);
+        if (student != null)
+        {
+            currentFee.StudentId = student.Id;
+            currentFee.StudentName = $"{student.FirstName} {student.LastName}";
+            currentFee.StudentClass = $"{student.Class}-{student.Section}";
+            currentFee.RollNumber = student.RollNumber;
+        }
+    }
+
+    private void OnFeeTypeChanged()
+    {
+        var feeType = currentFee.FeeType;
+        if (!string.IsNullOrEmpty(feeType) && !string.IsNullOrEmpty(currentFee.StudentClass))
+        {
+            var structure = feeStructures.FirstOrDefault(fs => 
+                fs.Class == currentFee.StudentClass.Split('-')[0] && 
+                fs.FeeType == feeType && 
+                fs.IsActive);
+            
+            if (structure != null)
+            {
+                currentFee.Amount = structure.Amount;
+            }
+        }
+    }
+
+    private void OnStatusChanged()
+    {
+        if (currentFee.Status == "Paid")
+        {
+            if (!currentFee.PaymentDate.HasValue)
+                currentFee.PaymentDate = DateTime.Now;
+            
+            if (string.IsNullOrEmpty(currentFee.ReceiptNumber))
+                currentFee.ReceiptNumber = GenerateReceiptNumber();
+            
+            if (currentFee.PaidAmount == 0)
+                currentFee.PaidAmount = currentFee.TotalAmount;
+        }
+    }
+
+    private void CalculateTotalAmount()
+    {
+        StateHasChanged();
+    }
+
+    private void EditFee(FeeRecord fee)
+    {
+        currentFee = new FeeRecord
+        {
+            Id = fee.Id,
+            StudentId = fee.StudentId,
+            StudentName = fee.StudentName,
+            StudentClass = fee.StudentClass,
+            RollNumber = fee.RollNumber,
+            AcademicYear = fee.AcademicYear,
+            FeeType = fee.FeeType,
+            FeeMonth = fee.FeeMonth,
+            Amount = fee.Amount,
+            LateFee = fee.LateFee,
+            Discount = fee.Discount,
+            DueDate = fee.DueDate,
+            PaymentDate = fee.PaymentDate,
+            Status = fee.Status,
+            PaymentMethod = fee.PaymentMethod,
+            TransactionId = fee.TransactionId,
+            ReceiptNumber = fee.ReceiptNumber,
+            PaidAmount = fee.PaidAmount,
+            Remarks = fee.Remarks,
+            CreatedDate = fee.CreatedDate
+        };
+        isEditing = true;
+        showForm = true;
+    }
+
+    private async Task SaveFee()
+    {
+        if (string.IsNullOrWhiteSpace(currentFee.StudentId) || 
+            string.IsNullOrWhiteSpace(currentFee.FeeType) ||
+            currentFee.Amount <= 0)
+        {
+            return;
+        }
+
+        currentFee.LastUpdated = DateTime.Now;
+
+        if (currentFee.Status == "Paid" && string.IsNullOrEmpty(currentFee.ReceiptNumber))
+        {
+            currentFee.ReceiptNumber = GenerateReceiptNumber();
+        }
+
+        if (isEditing)
+        {
+            await FeeService.UpdateAsync(currentFee);
+        }
+        else
+        {
+            await FeeService.AddAsync(currentFee);
+        }
+
+        await LoadData();
+        CancelForm();
+    }
+
+    private async Task DeleteFee(string id)
+    {
+        bool confirmed = await App.Current.MainPage.DisplayAlert(
+            "Confirm Delete",
+            "Are you sure you want to delete this fee record?",
+            "Yes",
+            "No");
+
+        if (confirmed)
+        {
+            await FeeService.DeleteAsync(id);
+            await LoadData();
+        }
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        currentFee = new FeeRecord();
+        isEditing = false;
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        filterStatus = string.Empty;
+        filterFeeType = string.Empty;
+        filterClass = string.Empty;
+        filterMonth = string.Empty;
+    }
+
+    // Bulk Generation
+    private void ShowBulkFeeGeneration()
+    {
+        showBulkGeneration = true;
+        bulkDueDate = DateTime.Today.AddDays(30);
+    }
+
+    private int GetBulkStudentCount()
+    {
+        return students.Count(s => s.IsActive && 
+            (string.IsNullOrEmpty(bulkClass) || s.Class == bulkClass));
+    }
+
+    private async Task GenerateBulkFees()
+    {
+        if (string.IsNullOrEmpty(bulkFeeType) || bulkAmount <= 0)
+        {
+            await App.Current.MainPage.DisplayAlert("Error", "Please fill all required fields", "OK");
+            return;
+        }
+
+        var targetStudents = students.Where(s => s.IsActive && 
+            (string.IsNullOrEmpty(bulkClass) || s.Class == bulkClass)).ToList();
+
+        foreach (var student in targetStudents)
+        {
+            var newFee = new FeeRecord
+            {
+                StudentId = student.Id,
+                StudentName = $"{student.FirstName} {student.LastName}",
+                StudentClass = $"{student.Class}-{student.Section}",
+                RollNumber = student.RollNumber,
+                FeeType = bulkFeeType,
+                FeeMonth = bulkMonth,
+                Amount = bulkAmount,
+                DueDate = bulkDueDate,
+                Status = "Pending",
+                AcademicYear = DateTime.Now.Year.ToString()
+            };
+
+            await FeeService.AddAsync(newFee);
+        }
+
+        await App.Current.MainPage.DisplayAlert("Success", 
+            $"Generated {targetStudents.Count} fee records successfully!", "OK");
+
+        showBulkGeneration = false;
+        await LoadData();
+    }
+
+    // Fee Structure
+    private void ShowFeeStructure()
+    {
+        showFeeStructureForm = true;
+    }
+
+    private void ShowAddFeeStructure()
+    {
+        currentFeeStructure = new FeeStructure();
+        isEditingStructure = false;
+        showAddFeeStructureForm = true;
+    }
+
+    private void EditFeeStructure(FeeStructure structure)
+    {
+        currentFeeStructure = new FeeStructure
+        {
+            Id = structure.Id,
+            Class = structure.Class,
+            FeeType = structure.FeeType,
+            Amount = structure.Amount,
+            Frequency = structure.Frequency,
+            IsActive = structure.IsActive,
+            Description = structure.Description
+        };
+        isEditingStructure = true;
+        showAddFeeStructureForm = true;
+    }
+
+    private async Task SaveFeeStructure()
+    {
+        if (isEditingStructure)
+        {
+            await FeeStructureService.UpdateAsync(currentFeeStructure);
+        }
+        else
+        {
+            await FeeStructureService.AddAsync(currentFeeStructure);
+        }
+
+        await LoadData();
+        CancelFeeStructureForm();
+    }
+
+    private async Task DeleteFeeStructure(string id)
+    {
+        bool confirmed = await App.Current.MainPage.DisplayAlert(
+            "Confirm Delete",
+            "Delete this fee structure?",
+            "Yes",
+            "No");
+
+        if (confirmed)
+        {
+            await FeeStructureService.DeleteAsync(id);
+            await LoadData();
+        }
+    }
+
+    private void CancelFeeStructureForm()
+    {
+        showAddFeeStructureForm = false;
+        currentFeeStructure = new FeeStructure();
+    }
+
+    // Quick Payment
+    private void QuickPayment(FeeRecord fee)
+    {
+        quickPaymentFee = fee;
+        quickPayAmount = fee.BalanceAmount;
+        showQuickPayment = true;
+    }
+
+    private async Task ProcessQuickPayment()
+    {
+        if (quickPaymentFee == null || quickPayAmount <= 0)
+            return;
+
+        quickPaymentFee.PaidAmount += quickPayAmount;
+        quickPaymentFee.PaymentDate = DateTime.Now;
+        quickPaymentFee.PaymentMethod = quickPayMethod;
+        
+        if (quickPaymentFee.BalanceAmount == 0)
+        {
+            quickPaymentFee.Status = "Paid";
+            if (string.IsNullOrEmpty(quickPaymentFee.ReceiptNumber))
+                quickPaymentFee.ReceiptNumber = GenerateReceiptNumber();
+        }
+        else
+        {
+            quickPaymentFee.Status = "Partial";
+        }
+
+        await FeeService.UpdateAsync(quickPaymentFee);
+        await LoadData();
+        CloseQuickPayment();
+    }
+
+    private void CloseQuickPayment()
+    {
+        showQuickPayment = false;
+        quickPaymentFee = null;
+        quickPayAmount = 0;
+    }
+
+    // Receipt
+    private void ViewReceipt(FeeRecord fee)
+    {
+        selectedReceipt = fee;
+        showReceiptModal = true;
+    }
+
+    private void CloseReceipt()
+    {
+        showReceiptModal = false;
+        selectedReceipt = null;
+    }
+
+    private void PrintReceipt()
+    {
+        // In a real app, you would use JavaScript Interop to print
+        App.Current.MainPage.DisplayAlert("Print", "Receipt will be printed...", "OK");
+    }
+
+    // Helper Methods
+    private List<string> GetUniqueClasses()
+    {
+        return students
+            .Where(s => !string.IsNullOrWhiteSpace(s.Class))
+            .Select(s => s.Class)
+            .Distinct()
+            .OrderBy(c => c)
+            .ToList();
+    }
+
+    private string GenerateReceiptNumber()
+    {
+        return $"RCP{DateTime.Now:yyyyMMddHHmmss}";
+    }
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Paid" => "bg-success",
+        "Pending" => "bg-warning",
+        "Partial" => "bg-info",
+        "Overdue" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusIcon(string status) => status switch
+    {
+        "Paid" => "✅",
+        "Pending" => "⏳",
+        "Partial" => "💰",
+        "Overdue" => "⚠️",
+        _ => "❓"
+    };
+
+    private string GetRowClass(FeeRecord fee)
+    {
+        if (fee.Status == "Overdue")
+            return "table-danger";
+        if (fee.Status == "Paid")
+            return "table-success";
+        return "";
+    }
+
+    private double GetCollectionRate()
+    {
+        var total = fees.Sum(f => f.TotalAmount);
+        if (total == 0) return 0;
+        return Math.Round((double)(TotalPaid / total * 100), 1);
+    }
+
+    private List<MonthlyData> GetLastSixMonthsCollection()
+    {
+        return fees
+            .Where(f => f.Status == "Paid" && f.PaymentDate.HasValue)
+            .GroupBy(f => new { f.PaymentDate.Value.Year, f.PaymentDate.Value.Month })
+            .Select(g => new MonthlyData
+            {
+                Month = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM"),
+                Amount = g.Sum(f => f.PaidAmount),
+                Count = g.Count()
+            })
+            .OrderByDescending(m => m.Month)
+            .Take(6)
+            .Reverse()
+            .ToList();
+    }
+
+    private List<FeeTypeData> GetFeeTypeDistribution()
+    {
+        var total = fees.Sum(f => f.TotalAmount);
+        if (total == 0) return new List<FeeTypeData>();
+
+        return fees
+            .GroupBy(f => f.FeeType)
+            .Select(g => new FeeTypeData
+            {
+                Type = g.Key,
+                Amount = g.Sum(f => f.TotalAmount),
+                Percentage = (double)(g.Sum(f => f.TotalAmount) / total * 100)
+            })
+            .OrderByDescending(f => f.Amount)
+            .ToList();
+    }
+
+    private string GetRandomColor()
+    {
+        var colors = new[] { "bg-primary", "bg-success", "bg-info", "bg-warning", "bg-danger" };
+        return colors[new Random().Next(colors.Length)];
+    }
+
+    // Helper Classes
+    private class MonthlyData
+    {
+        public string Month { get; set; } = "";
+        public decimal Amount { get; set; }
+        public int Count { get; set; }
+    }
+
+    private class FeeTypeData
+    {
+        public string Type { get; set; } = "";
+        public decimal Amount { get; set; }
+        public double Percentage { get; set; }
+    }
+}

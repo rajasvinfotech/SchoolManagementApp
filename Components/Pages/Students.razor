@@ -1,0 +1,394 @@
+﻿@page "/students"
+@using SchoolManagementApp.Models
+@using SchoolManagementApp.Services
+@inject IDataService<Student> StudentService
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col">
+            <h3>Student Management</h3>
+        </div>
+        <div class="col text-end">
+            <button class="btn btn-primary" @onclick="ShowAddForm">
+                <i class="bi bi-plus-circle"></i> Add Student
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="ClearError"></button>
+        </div>
+    }
+
+    @if (showForm)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>@(isEditing ? "Edit Student" : "Add New Student")</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="currentStudent" OnValidSubmit="SaveStudent">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">First Name</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.FirstName" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Last Name</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.LastName" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email</label>
+                            <InputText type="email" class="form-control" @bind-Value="currentStudent.Email" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.Phone" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Class</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.Class" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Section</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.Section" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Roll Number</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.RollNumber" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date of Birth</label>
+                            <InputDate class="form-control" @bind-Value="currentStudent.DateOfBirth" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Enrollment Date</label>
+                            <InputDate class="form-control" @bind-Value="currentStudent.EnrollmentDate" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <InputTextArea class="form-control" @bind-Value="currentStudent.Address" rows="2" />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Parent Name</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.ParentName" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Parent Contact</label>
+                            <InputText class="form-control" @bind-Value="currentStudent.ParentContact" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="currentStudent.IsActive" />
+                            <label class="form-check-label">Active</label>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success" disabled="@isBusy">
+                            @(isBusy ? "Saving..." : "Save")
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelForm" disabled="@isBusy">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3">
+                <input type="text"
+                       class="form-control"
+                       placeholder="Search students..."
+                       @bind="searchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Roll No</th>
+                            <th>Name</th>
+                            <th>Class</th>
+                            <th>Section</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Parent</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (FilteredStudents.Any())
+                        {
+                            @foreach (var student in FilteredStudents)
+                            {
+                                <tr>
+                                    <td>@student.RollNumber</td>
+                                    <td>@student.FirstName @student.LastName</td>
+                                    <td>@student.Class</td>
+                                    <td>@student.Section</td>
+                                    <td>@student.Email</td>
+                                    <td>@student.Phone</td>
+                                    <td>@student.ParentName</td>
+                                    <td>
+                                        <span class="badge @(student.IsActive ? "bg-success" : "bg-danger")">
+                                            @(student.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning me-1"
+                                                @onclick="() => EditStudent(student)"
+                                                disabled="@isBusy">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger"
+                                                @onclick="() => DeleteStudent(student.Id)"
+                                                disabled="@isBusy">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="9" class="text-center text-muted">
+                                    No students found.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (!students.Any())
+            {
+                <div class="alert alert-info mt-3">
+                    No students found. Add your first student!
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Student> students = new();
+    private Student currentStudent = new();
+    private bool showForm = false;
+    private bool isEditing = false;
+    private bool isBusy = false;
+    private string searchTerm = string.Empty;
+    private string errorMessage = string.Empty;
+
+    private IEnumerable<Student> FilteredStudents =>
+        students.Where(s =>
+            string.IsNullOrWhiteSpace(searchTerm) ||
+            (s.FirstName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.LastName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.RollNumber?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.Class?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.Section?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (s.Email?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStudents();
+    }
+
+    private async Task LoadStudents()
+    {
+        try
+        {
+            isBusy = true;
+            ClearError();
+
+            var result = await StudentService.GetAllAsync();
+            students = result ?? new List<Student>();
+        }
+        catch (Exception ex)
+        {
+            students = new List<Student>();
+            errorMessage = $"Failed to load students: {ex.Message}";
+            await ShowMessageAsync("Error", errorMessage);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        ClearError();
+
+        currentStudent = new Student
+        {
+            IsActive = true,
+            EnrollmentDate = DateTime.Today
+        };
+
+        isEditing = false;
+        showForm = true;
+    }
+
+    private void EditStudent(Student student)
+    {
+        ClearError();
+
+        currentStudent = new Student
+        {
+            Id = student.Id,
+            FirstName = student.FirstName,
+            LastName = student.LastName,
+            Email = student.Email,
+            Phone = student.Phone,
+            Class = student.Class,
+            Section = student.Section,
+            RollNumber = student.RollNumber,
+            DateOfBirth = student.DateOfBirth,
+            Address = student.Address,
+            ParentName = student.ParentName,
+            ParentContact = student.ParentContact,
+            EnrollmentDate = student.EnrollmentDate,
+            IsActive = student.IsActive
+        };
+
+        isEditing = true;
+        showForm = true;
+    }
+
+    private async Task SaveStudent()
+    {
+        try
+        {
+            isBusy = true;
+            ClearError();
+
+            if (isEditing)
+            {
+                await StudentService.UpdateAsync(currentStudent);
+                await ShowMessageAsync("Success", "Student updated successfully.");
+            }
+            else
+            {
+                await StudentService.AddAsync(currentStudent);
+                await ShowMessageAsync("Success", "Student added successfully.");
+            }
+
+            await LoadStudents();
+            CancelForm();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save student: {ex.Message}";
+            await ShowMessageAsync("Error", errorMessage);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task DeleteStudent(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            await ShowMessageAsync("Error", "Invalid student id.");
+            return;
+        }
+
+        try
+        {
+            ClearError();
+
+            var confirmed = await ShowConfirmAsync(
+                "Confirm Delete",
+                "Are you sure you want to delete this student?",
+                "Yes",
+                "No");
+
+            if (!confirmed)
+                return;
+
+            isBusy = true;
+
+            await StudentService.DeleteAsync(id);
+            await LoadStudents();
+            await ShowMessageAsync("Success", "Student deleted successfully.");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete student: {ex.Message}";
+            await ShowMessageAsync("Error", errorMessage);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        isEditing = false;
+        currentStudent = new Student();
+        ClearError();
+    }
+
+    private void ClearError()
+    {
+        errorMessage = string.Empty;
+    }
+
+    private static Page? GetCurrentPage()
+    {
+        return Application.Current?.Windows.FirstOrDefault()?.Page;
+    }
+
+    private async Task ShowMessageAsync(string title, string message)
+    {
+        var page = GetCurrentPage();
+        if (page is not null)
+        {
+            await page.DisplayAlert(title, message, "OK");
+        }
+    }
+
+    private async Task<bool> ShowConfirmAsync(string title, string message, string accept, string cancel)
+    {
+        var page = GetCurrentPage();
+        if (page is not null)
+        {
+            return await page.DisplayAlert(title, message, accept, cancel);
+        }
+
+        return false;
+    }
+}

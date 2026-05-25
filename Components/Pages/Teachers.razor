@@ -1,0 +1,327 @@
+@page "/teachers"
+@using SchoolManagementApp.Models
+@using SchoolManagementApp.Services
+@inject IDataService<Teacher> TeacherService
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col">
+            <h3>Teacher Management</h3>
+        </div>
+        <div class="col text-end">
+            <button class="btn btn-primary" @onclick="ShowAddForm">
+                <i class="bi bi-plus-circle"></i> Add Teacher
+            </button>
+        </div>
+    </div>
+
+    @if (showForm)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>@(isEditing ? "Edit Teacher" : "Add New Teacher")</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="currentTeacher" OnValidSubmit="SaveTeacher">
+                    <DataAnnotationsValidator />
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">First Name <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="currentTeacher.FirstName" placeholder="Enter first name" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="currentTeacher.LastName" placeholder="Enter last name" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email <span class="text-danger">*</span></label>
+                            <InputText type="email" class="form-control" @bind-Value="currentTeacher.Email" placeholder="teacher@school.com" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="currentTeacher.Phone" placeholder="+91 XXXXXXXXXX" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Subject <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="currentTeacher.Subject">
+                                <option value="">Select Subject</option>
+                                <option value="Mathematics">Mathematics</option>
+                                <option value="Science">Science</option>
+                                <option value="English">English</option>
+                                <option value="Hindi">Hindi</option>
+                                <option value="Social Studies">Social Studies</option>
+                                <option value="Computer Science">Computer Science</option>
+                                <option value="Physical Education">Physical Education</option>
+                                <option value="Art & Craft">Art & Craft</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Qualification</label>
+                            <InputText class="form-control" @bind-Value="currentTeacher.Qualification" placeholder="B.Ed, M.Sc, etc." />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Joining Date</label>
+                            <InputDate class="form-control" @bind-Value="currentTeacher.JoiningDate" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Salary (₹)</label>
+                            <InputNumber class="form-control" @bind-Value="currentTeacher.Salary" placeholder="Enter monthly salary" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" id="activeCheck" @bind-Value="currentTeacher.IsActive" />
+                            <label class="form-check-label" for="activeCheck">Active Teacher</label>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save"></i> Save
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelForm">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <!-- Statistics Cards -->
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6>Total Teachers</h6>
+                    <h3>@teachers.Count</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6>Active Teachers</h6>
+                    <h3>@teachers.Count(t => t.IsActive)</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6>Average Salary</h6>
+                    <h3>₹@(teachers.Any() ? teachers.Average(t => t.Salary).ToString("N0") : "0")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6>Total Payroll</h6>
+                    <h3>₹@teachers.Where(t => t.IsActive).Sum(t => t.Salary).ToString("N0")</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <input type="text" class="form-control" placeholder="Search teachers by name, subject..." 
+                           @bind="searchTerm" @bind:event="oninput" />
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" @bind="filterSubject">
+                        <option value="">All Subjects</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Science">Science</option>
+                        <option value="English">English</option>
+                        <option value="Hindi">Hindi</option>
+                        <option value="Social Studies">Social Studies</option>
+                        <option value="Computer Science">Computer Science</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" @bind="filterStatus">
+                        <option value="">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Subject</th>
+                            <th>Qualification</th>
+                            <th>Joining Date</th>
+                            <th>Salary</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var teacher in FilteredTeachers)
+                        {
+                            <tr>
+                                <td><strong>@teacher.FirstName @teacher.LastName</strong></td>
+                                <td>@teacher.Email</td>
+                                <td>@teacher.Phone</td>
+                                <td><span class="badge bg-primary">@teacher.Subject</span></td>
+                                <td>@teacher.Qualification</td>
+                                <td>@teacher.JoiningDate.ToString("dd MMM yyyy")</td>
+                                <td>₹@teacher.Salary.ToString("N2")</td>
+                                <td>
+                                    <span class="badge @(teacher.IsActive ? "bg-success" : "bg-danger")">
+                                        @(teacher.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-warning" @onclick="() => EditTeacher(teacher)" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteTeacher(teacher.Id)" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (!teachers.Any())
+            {
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-info-circle"></i> No teachers found. Click "Add Teacher" to add your first teacher!
+                </div>
+            }
+            else if (!FilteredTeachers.Any())
+            {
+                <div class="alert alert-warning text-center">
+                    <i class="bi bi-search"></i> No teachers match your search criteria.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Teacher> teachers = new();
+    private Teacher currentTeacher = new();
+    private bool showForm = false;
+    private bool isEditing = false;
+    private string searchTerm = string.Empty;
+    private string filterSubject = string.Empty;
+    private string filterStatus = string.Empty;
+
+    private IEnumerable<Teacher> FilteredTeachers =>
+        teachers.Where(t =>
+            (string.IsNullOrWhiteSpace(filterSubject) || t.Subject == filterSubject) &&
+            (string.IsNullOrWhiteSpace(filterStatus) || 
+                (filterStatus == "Active" && t.IsActive) || 
+                (filterStatus == "Inactive" && !t.IsActive)) &&
+            (string.IsNullOrWhiteSpace(searchTerm) ||
+            t.FirstName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            t.LastName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            t.Subject.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            t.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeachers();
+    }
+
+    private async Task LoadTeachers()
+    {
+        teachers = await TeacherService.GetAllAsync();
+    }
+
+    private void ShowAddForm()
+    {
+        currentTeacher = new Teacher();
+        isEditing = false;
+        showForm = true;
+    }
+
+    private void EditTeacher(Teacher teacher)
+    {
+        currentTeacher = new Teacher
+        {
+            Id = teacher.Id,
+            FirstName = teacher.FirstName,
+            LastName = teacher.LastName,
+            Email = teacher.Email,
+            Phone = teacher.Phone,
+            Subject = teacher.Subject,
+            Qualification = teacher.Qualification,
+            JoiningDate = teacher.JoiningDate,
+            Salary = teacher.Salary,
+            IsActive = teacher.IsActive
+        };
+        isEditing = true;
+        showForm = true;
+    }
+
+    private async Task SaveTeacher()
+    {
+        if (string.IsNullOrWhiteSpace(currentTeacher.FirstName) || 
+            string.IsNullOrWhiteSpace(currentTeacher.LastName))
+        {
+            return;
+        }
+
+        if (isEditing)
+        {
+            await TeacherService.UpdateAsync(currentTeacher);
+        }
+        else
+        {
+            await TeacherService.AddAsync(currentTeacher);
+        }
+
+        await LoadTeachers();
+        CancelForm();
+    }
+
+    private async Task DeleteTeacher(string id)
+    {
+        bool confirmed = await App.Current.MainPage.DisplayAlert(
+            "Confirm Delete",
+            "Are you sure you want to delete this teacher?",
+            "Yes",
+            "No");
+
+        if (confirmed)
+        {
+            await TeacherService.DeleteAsync(id);
+            await LoadTeachers();
+        }
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        currentTeacher = new Teacher();
+        isEditing = false;
+    }
+}

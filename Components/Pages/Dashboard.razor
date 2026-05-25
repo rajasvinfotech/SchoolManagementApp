@@ -1,0 +1,227 @@
+@page "/"
+@using SchoolManagementApp.Models
+@using SchoolManagementApp.Services
+@inject IDataService<Student> StudentService
+@inject IDataService<FeeRecord> FeeService
+@inject IDataService<Teacher> TeacherService
+
+<div class="container-fluid">
+    <h3 class="mb-4">School Dashboard</h3>
+
+    <div class="row">
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Total Students</h6>
+                            <h2>@totalStudents</h2>
+                        </div>
+                        <i class="bi bi-people" style="font-size: 3rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Active Students</h6>
+                            <h2>@activeStudents</h2>
+                        </div>
+                        <i class="bi bi-person-check" style="font-size: 3rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Total Teachers</h6>
+                            <h2>@totalTeachers</h2>
+                        </div>
+                        <i class="bi bi-person-badge" style="font-size: 3rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title">Pending Fees</h6>
+                            <h2>₹@pendingFees.ToString("N0")</h2>
+                        </div>
+                        <i class="bi bi-currency-rupee" style="font-size: 3rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Fee Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Collected</span>
+                            <span>₹@paidFees.ToString("N2")</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar bg-success" style="width: @GetPercentage(paidFees, totalFees)%">
+                                @GetPercentage(paidFees, totalFees).ToString("F1")%
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Pending</span>
+                            <span>₹@pendingFees.ToString("N2")</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar bg-warning" style="width: @GetPercentage(pendingFees, totalFees)%">
+                                @GetPercentage(pendingFees, totalFees).ToString("F1")%
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Overdue</span>
+                            <span>₹@overdueFees.ToString("N2")</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar bg-danger" style="width: @GetPercentage(overdueFees, totalFees)%">
+                                @GetPercentage(overdueFees, totalFees).ToString("F1")%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Fee Payments</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        @foreach (var fee in recentPayments.Take(5))
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <strong>@fee.StudentName</strong>
+                                        <br />
+                                        <small>@fee.FeeType - @fee.PaymentDate?.ToString("dd MMM yyyy")</small>
+                                    </div>
+                                    <span class="badge bg-success">₹@fee.Amount.ToString("N2")</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Students</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Roll No</th>
+                                    <th>Name</th>
+                                    <th>Class</th>
+                                    <th>Email</th>
+                                    <th>Enrollment Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var student in recentStudents.Take(5))
+                                {
+                                    <tr>
+                                        <td>@student.RollNumber</td>
+                                        <td>@student.FirstName @student.LastName</td>
+                                        <td>@student.Class-@student.Section</td>
+                                        <td>@student.Email</td>
+                                        <td>@student.EnrollmentDate.ToString("dd MMM yyyy")</td>
+                                        <td>
+                                            <span class="badge @(student.IsActive ? "bg-success" : "bg-danger")">
+                                                @(student.IsActive ? "Active" : "Inactive")
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int totalStudents;
+    private int activeStudents;
+    private int totalTeachers;
+    private decimal paidFees;
+    private decimal pendingFees;
+    private decimal overdueFees;
+    private decimal totalFees;
+    private List<Student> recentStudents = new();
+    private List<FeeRecord> recentPayments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        var students = await StudentService.GetAllAsync();
+        var fees = await FeeService.GetAllAsync();
+        var teachers = await TeacherService.GetAllAsync();
+
+        totalStudents = students.Count;
+        activeStudents = students.Count(s => s.IsActive);
+        totalTeachers = teachers.Count(t => t.IsActive);
+
+        paidFees = fees.Where(f => f.Status == "Paid").Sum(f => f.Amount);
+        pendingFees = fees.Where(f => f.Status == "Pending").Sum(f => f.Amount);
+        overdueFees = fees.Where(f => f.Status == "Overdue").Sum(f => f.Amount);
+        totalFees = paidFees + pendingFees + overdueFees;
+
+        recentStudents = students.OrderByDescending(s => s.EnrollmentDate).ToList();
+        recentPayments = fees.Where(f => f.Status == "Paid")
+                             .OrderByDescending(f => f.PaymentDate)
+                             .ToList();
+    }
+
+    private double GetPercentage(decimal value, decimal total)
+    {
+        if (total == 0) return 0;
+        return (double)(value / total * 100);
+    }
+}

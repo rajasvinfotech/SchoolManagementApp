@@ -1,0 +1,518 @@
+@page "/reports"
+@using SchoolManagementApp.Models
+@using SchoolManagementApp.Services
+@inject IDataService<Student> StudentService
+@inject IDataService<FeeRecord> FeeService
+@inject IDataService<Teacher> TeacherService
+@inject IDataService<Attendance> AttendanceService
+
+<div class="container-fluid">
+    <h3 class="mb-4"><i class="bi bi-file-earmark-bar-graph"></i> Reports & Analytics</h3>
+
+    <!-- Report Type Selection -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label">Select Report Type</label>
+                    <select class="form-select" @bind="selectedReportType">
+                        <option value="StudentReport">Student Report</option>
+                        <option value="FeeReport">Fee Report</option>
+                        <option value="AttendanceReport">Attendance Report</option>
+                        <option value="TeacherReport">Teacher Report</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" @bind="fromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" @bind="toDate" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button class="btn btn-primary w-100" @onclick="GenerateReport">
+                        <i class="bi bi-graph-up"></i> Generate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (selectedReportType == "StudentReport")
+    {
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="bi bi-people"></i> Student Report</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>Total Students</h6>
+                                <h2>@students.Count</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>Active</h6>
+                                <h2 class="text-success">@students.Count(s => s.IsActive)</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>Inactive</h6>
+                                <h2 class="text-danger">@students.Count(s => !s.IsActive)</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>New This Month</h6>
+                                <h2 class="text-info">@GetNewStudentsThisMonth()</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6>Class-wise Distribution</h6>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Class</th>
+                            <th>Total Students</th>
+                            <th>Active</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var classGroup in GetClassWiseData())
+                        {
+                            <tr>
+                                <td><strong>@classGroup.Key</strong></td>
+                                <td>@classGroup.Count()</td>
+                                <td>@classGroup.Count(s => s.IsActive)</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" 
+                                             style="width: @GetPercentage(classGroup.Count(), students.Count)%">
+                                            @GetPercentage(classGroup.Count(), students.Count).ToString("F1")%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (selectedReportType == "FeeReport")
+    {
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5><i class="bi bi-currency-rupee"></i> Fee Collection Report</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h6>Total Collected</h6>
+                                <h3>₹@GetTotalCollected().ToString("N2")</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body text-center">
+                                <h6>Pending</h6>
+                                <h3>₹@GetTotalPending().ToString("N2")</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-danger text-white">
+                            <div class="card-body text-center">
+                                <h6>Overdue</h6>
+                                <h3>₹@GetTotalOverdue().ToString("N2")</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <h6>Collection %</h6>
+                                <h3>@GetCollectionPercentage()%</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6>Fee Type-wise Collection</h6>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Fee Type</th>
+                            <th>Total Amount</th>
+                            <th>Collected</th>
+                            <th>Pending</th>
+                            <th>Collection %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var feeGroup in GetFeeTypeWiseData())
+                        {
+                            var total = feeGroup.Sum(f => f.Amount);
+                            var collected = feeGroup.Where(f => f.Status == "Paid").Sum(f => f.Amount);
+                            var pending = feeGroup.Where(f => f.Status != "Paid").Sum(f => f.Amount);
+                            
+                            <tr>
+                                <td><strong>@feeGroup.Key</strong></td>
+                                <td>₹@total.ToString("N2")</td>
+                                <td class="text-success">₹@collected.ToString("N2")</td>
+                                <td class="text-warning">₹@pending.ToString("N2")</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" 
+                                             style="width: @GetPercentage(collected, total)%">
+                                            @GetPercentage(collected, total).ToString("F1")%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <h6 class="mt-4">Monthly Collection Trend</h6>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Amount Collected</th>
+                            <th>Transactions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var monthGroup in GetMonthlyCollection())
+                        {
+                            <tr>
+                                <td>@monthGroup.Month</td>
+                                <td class="text-success">₹@monthGroup.Amount.ToString("N2")</td>
+                                <td>@monthGroup.Count</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (selectedReportType == "AttendanceReport")
+    {
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5><i class="bi bi-calendar-check"></i> Attendance Report</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h6>Average Attendance</h6>
+                                <h3>@GetAverageAttendance()%</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <h6>Total Records</h6>
+                                <h3>@attendanceRecords.Count</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body text-center">
+                                <h6>Days Covered</h6>
+                                <h3>@GetUniqueDaysCount()</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6>Student-wise Attendance</h6>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Total Days</th>
+                            <th>Present</th>
+                            <th>Absent</th>
+                            <th>Late</th>
+                            <th>Attendance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var studentAtt in GetStudentWiseAttendance())
+                        {
+                            <tr>
+                                <td><strong>@studentAtt.StudentName</strong></td>
+                                <td>@studentAtt.TotalDays</td>
+                                <td class="text-success">@studentAtt.Present</td>
+                                <td class="text-danger">@studentAtt.Absent</td>
+                                <td class="text-warning">@studentAtt.Late</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar @GetAttendanceColorClass(studentAtt.Percentage)" 
+                                             style="width: @studentAtt.Percentage%">
+                                            @studentAtt.Percentage.ToString("F1")%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (selectedReportType == "TeacherReport")
+    {
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="bi bi-person-badge"></i> Teacher Report</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>Total Teachers</h6>
+                                <h2>@teachers.Count</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>Average Salary</h6>
+                                <h2>₹@(teachers.Any() ? teachers.Average(t => t.Salary).ToString("N0") : "0")</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>Total Payroll</h6>
+                                <h2>₹@teachers.Sum(t => t.Salary).ToString("N0")</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6>Subject-wise Distribution</h6>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Teachers</th>
+                            <th>Average Salary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var subGroup in GetSubjectWiseData())
+                        {
+                            <tr>
+                                <td><strong>@subGroup.Key</strong></td>
+                                <td>@subGroup.Count()</td>
+                                <td>₹@subGroup.Average(t => t.Salary).ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Student> students = new();
+    private List<FeeRecord> feeRecords = new();
+    private List<Teacher> teachers = new();
+    private List<Attendance> attendanceRecords = new();
+    
+    private string selectedReportType = "StudentReport";
+    private DateTime fromDate = DateTime.Today.AddMonths(-1);
+    private DateTime toDate = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllData();
+    }
+
+    private async Task LoadAllData()
+    {
+        students = await StudentService.GetAllAsync();
+        feeRecords = await FeeService.GetAllAsync();
+        teachers = await TeacherService.GetAllAsync();
+        attendanceRecords = await AttendanceService.GetAllAsync();
+    }
+
+    private async Task GenerateReport()
+    {
+        await LoadAllData();
+        StateHasChanged();
+    }
+
+    // Student Report Methods
+    private int GetNewStudentsThisMonth()
+    {
+        var firstDayOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        return students.Count(s => s.EnrollmentDate >= firstDayOfMonth);
+    }
+
+    private IEnumerable<IGrouping<string, Student>> GetClassWiseData()
+    {
+        return students
+            .Where(s => !string.IsNullOrEmpty(s.Class))
+            .GroupBy(s => s.Class)
+            .OrderBy(g => g.Key);
+    }
+
+    // Fee Report Methods
+    private decimal GetTotalCollected()
+    {
+        return feeRecords.Where(f => f.Status == "Paid" && 
+            f.PaymentDate >= fromDate && f.PaymentDate <= toDate).Sum(f => f.Amount);
+    }
+
+    private decimal GetTotalPending()
+    {
+        return feeRecords.Where(f => f.Status == "Pending").Sum(f => f.Amount);
+    }
+
+    private decimal GetTotalOverdue()
+    {
+        return feeRecords.Where(f => f.Status == "Overdue").Sum(f => f.Amount);
+    }
+
+    private double GetCollectionPercentage()
+    {
+        var total = feeRecords.Sum(f => f.Amount);
+        if (total == 0) return 0;
+        return Math.Round((double)(GetTotalCollected() / total * 100), 1);
+    }
+
+    private IEnumerable<IGrouping<string, FeeRecord>> GetFeeTypeWiseData()
+    {
+        return feeRecords
+            .Where(f => !string.IsNullOrEmpty(f.FeeType))
+            .GroupBy(f => f.FeeType);
+    }
+
+    private List<MonthlyCollection> GetMonthlyCollection()
+    {
+        return feeRecords
+            .Where(f => f.Status == "Paid" && f.PaymentDate.HasValue)
+            .GroupBy(f => new { f.PaymentDate.Value.Year, f.PaymentDate.Value.Month })
+            .Select(g => new MonthlyCollection
+            {
+                Month = $"{new DateTime(g.Key.Year, g.Key.Month, 1):MMMM yyyy}",
+                Amount = g.Sum(f => f.Amount),
+                Count = g.Count()
+            })
+            .OrderByDescending(m => m.Month)
+            .Take(6)
+            .ToList();
+    }
+
+    // Attendance Report Methods
+    private double GetAverageAttendance()
+    {
+        var total = attendanceRecords.Count;
+        if (total == 0) return 0;
+        var present = attendanceRecords.Count(a => a.Status == "Present");
+        return Math.Round((double)present / total * 100, 1);
+    }
+
+    private int GetUniqueDaysCount()
+    {
+        return attendanceRecords.Select(a => a.Date.Date).Distinct().Count();
+    }
+
+    private List<StudentAttendanceSummary> GetStudentWiseAttendance()
+    {
+        return attendanceRecords
+            .GroupBy(a => a.StudentName)
+            .Select(g => new StudentAttendanceSummary
+            {
+                StudentName = g.Key,
+                TotalDays = g.Count(),
+                Present = g.Count(a => a.Status == "Present"),
+                Absent = g.Count(a => a.Status == "Absent"),
+                Late = g.Count(a => a.Status == "Late"),
+                Percentage = g.Count() > 0 ? Math.Round((double)g.Count(a => a.Status == "Present") / g.Count() * 100, 1) : 0
+            })
+            .OrderByDescending(s => s.Percentage)
+            .ToList();
+    }
+
+    // Teacher Report Methods
+    private IEnumerable<IGrouping<string, Teacher>> GetSubjectWiseData()
+    {
+        return teachers
+            .Where(t => !string.IsNullOrEmpty(t.Subject))
+            .GroupBy(t => t.Subject);
+    }
+
+    // Helper Methods
+    private double GetPercentage(int value, int total)
+    {
+        if (total == 0) return 0;
+        return Math.Round((double)value / total * 100, 1);
+    }
+
+    private double GetPercentage(decimal value, decimal total)
+    {
+        if (total == 0) return 0;
+        return Math.Round((double)(value / total * 100), 1);
+    }
+
+    private string GetAttendanceColorClass(double percentage)
+    {
+        if (percentage >= 90) return "bg-success";
+        if (percentage >= 75) return "bg-info";
+        if (percentage >= 60) return "bg-warning";
+        return "bg-danger";
+    }
+
+    // Helper Classes
+    private class MonthlyCollection
+    {
+        public string Month { get; set; } = "";
+        public decimal Amount { get; set; }
+        public int Count { get; set; }
+    }
+
+    private class StudentAttendanceSummary
+    {
+        public string StudentName { get; set; } = "";
+        public int TotalDays { get; set; }
+        public int Present { get; set; }
+        public int Absent { get; set; }
+        public int Late { get; set; }
+        public double Percentage { get; set; }
+    }
+}

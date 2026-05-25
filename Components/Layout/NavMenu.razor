@@ -1,0 +1,74 @@
+﻿<div class="sidebar-brand">
+    <div class="brand-logo">🏫</div>
+    <div class="brand-text">
+        <span class="brand-title">School</span>
+        <span class="brand-subtitle">Management System</span>
+    </div>
+    <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="bi bi-list"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable">
+    <nav class="flex-column">
+        <div class="nav-section-label">MAIN MENU</div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="nav-icon"><i class="bi bi-speedometer2"></i></span>
+                <span class="nav-text">Dashboard</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-section-label">ACADEMIC</div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="students">
+                <span class="nav-icon"><i class="bi bi-people-fill"></i></span>
+                <span class="nav-text">Students</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="teachers">
+                <span class="nav-icon"><i class="bi bi-person-badge-fill"></i></span>
+                <span class="nav-text">Teachers</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="attendance">
+                <span class="nav-icon"><i class="bi bi-calendar-check-fill"></i></span>
+                <span class="nav-text">Attendance</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-section-label">FINANCE</div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="fees">
+                <span class="nav-icon"><i class="bi bi-currency-rupee"></i></span>
+                <span class="nav-text">Fee Management</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-section-label">INSIGHTS</div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="reports">
+                <span class="nav-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
+                <span class="nav-text">Reports</span>
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}
